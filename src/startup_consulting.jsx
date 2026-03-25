@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const C = {
   black: "#0a0a0a",
@@ -533,14 +533,21 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 4000, messages: [{ role: "user", content: buildPrompt(answers) }] })
       });
-      const data = await res.json();
       clearInterval(interval);
+
+      // 텍스트로 먼저 받아서 JSON 여부 확인
+      const raw = await res.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch { setResult({ error: `서버 응답 오류 (${res.status}): ${raw.slice(0, 200)}` }); return; }
+
       if (data.error) { setResult({ error: `API 오류: ${data.error?.message || JSON.stringify(data.error)}` }); return; }
+
       const text = (data.content||[]).map(c => c.text||"").join("");
       setLoadingPct(100);
       try { setResult(JSON.parse(text.replace(/```json\s*/g,"").replace(/```\s*/g,"").trim())); }
-      catch { setResult({ error: text.slice(0, 400) }); }
-    } catch(err) { clearInterval(interval); clearInterval(pctInterval); setResult({ error: err.message }); }
+      catch { setResult({ error: `결과 파싱 오류: ${text.slice(0, 300)}` }); }
+    } catch(err) { clearInterval(interval); clearInterval(pctInterval); setResult({ error: `연결 오류: ${err.message}` }); }
     finally { clearInterval(pctInterval); setLoading(false); }
   };
 
