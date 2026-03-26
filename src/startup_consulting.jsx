@@ -289,15 +289,16 @@ function StrengthBar({ name, score }) {
   );
 }
 
-// ── PDF Export ──────────────────────────────────────────────
+// ── Image/PDF Export ──────────────────────────────────────────────
 function PdfExport({ data }) {
   const [dismissed, setDismissed] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { default: jsPDF } = await import("jspdf");
       const { default: html2canvas } = await import("html2canvas");
       const el = document.getElementById("result-pdf-area");
       const canvas = await html2canvas(el, {
@@ -307,21 +308,34 @@ function PdfExport({ data }) {
         logging: false,
         allowTaint: true,
       });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
-      let y = 0;
-      while (y < imgH) {
-        if (y > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, -y, pageW, imgH);
-        y += pageH;
+
+      if (isMobile) {
+        // 모바일 — PNG 이미지로 저장
+        const imgData = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        const title = (data?.profile_title || "결과").slice(0, 20).replace(/\s+/g, "_");
+        link.download = `BusinessDNA_${title}.png`;
+        link.href = imgData;
+        link.click();
+      } else {
+        // PC — PDF로 저장
+        const { default: jsPDF } = await import("jspdf");
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const imgH = (canvas.height * pageW) / canvas.width;
+        let y = 0;
+        while (y < imgH) {
+          if (y > 0) pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, -y, pageW, imgH);
+          y += pageH;
+        }
+        const title = (data?.profile_title || "결과").slice(0, 20).replace(/\s+/g, "_");
+        pdf.save(`BusinessDNA_${title}.pdf`);
       }
-      const title = (data?.profile_title || "결과").slice(0, 20).replace(/\s+/g, "_");
-      pdf.save(`BusinessDNA_${title}.pdf`);
     } catch (e) {
-      alert("PDF 저장 중 오류가 발생했습니다: " + e.message);
+      alert("저장 중 오류가 발생했습니다: " + e.message);
     } finally {
       setSaving(false);
     }
@@ -332,15 +346,15 @@ function PdfExport({ data }) {
     <div className="no-print" style={{ marginTop: 56, borderTop: `1px solid ${C.gray200}`, paddingTop: 36 }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.3, color: C.black, marginBottom: 8 }}>
-          결과를 PDF 파일로 저장하시겠습니까?
+          결과를 저장하시겠습니까?
         </div>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: C.gray400, marginBottom: 24 }}>
-          버튼을 누르면 바로 다운로드됩니다
+          {isMobile ? "이미지(PNG)로 저장됩니다" : "PDF 파일로 저장됩니다"}
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <button onClick={handleSave} disabled={saving}
             style={{ padding: "13px 36px", background: saving ? C.gray400 : C.black, color: C.white, border: "none", cursor: saving ? "wait" : "pointer", fontSize: 14, fontWeight: 700, letterSpacing: 0.5, transition: "background .2s" }}>
-            {saving ? "저장 중..." : "PDF 저장"}
+            {saving ? "저장 중..." : isMobile ? "이미지 저장" : "PDF 저장"}
           </button>
           <button onClick={() => setDismissed(true)}
             style={{ padding: "13px 28px", background: C.white, color: C.gray400, border: `1px solid ${C.gray200}`, cursor: "pointer", fontSize: 13 }}>
