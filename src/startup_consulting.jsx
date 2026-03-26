@@ -528,7 +528,7 @@ export default function App() {
       setLoadingPct(Math.round(pct));
     }, 400);
     try {
-      const res = await fetch("/api/v1/messages", {
+      const res = await fetch("/api/proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 4000, messages: [{ role: "user", content: buildPrompt(answers) }] })
