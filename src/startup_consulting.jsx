@@ -290,30 +290,57 @@ function StrengthBar({ name, score }) {
 }
 
 // ── PDF Export ──────────────────────────────────────────────
-function PdfExport() {
+function PdfExport({ data }) {
   const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    window.print();
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: html2canvas } = await import("html2canvas");
+      const el = document.getElementById("result-pdf-area");
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        allowTaint: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      let y = 0;
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, -y, pageW, imgH);
+        y += pageH;
+      }
+      const title = (data?.profile_title || "결과").slice(0, 20).replace(/\s+/g, "_");
+      pdf.save(`BusinessDNA_${title}.pdf`);
+    } catch (e) {
+      alert("PDF 저장 중 오류가 발생했습니다: " + e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (dismissed) return null;
   return (
     <div className="no-print" style={{ marginTop: 56, borderTop: `1px solid ${C.gray200}`, paddingTop: 36 }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.3, color: C.black, marginBottom: 8 }}>
           결과를 PDF 파일로 저장하시겠습니까?
         </div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: C.gray400, marginBottom: 6 }}>
-          PC: 인쇄 창에서 "PDF로 저장" 선택
-        </div>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: C.gray400, marginBottom: 24 }}>
-          모바일: 공유 버튼 → "PDF로 저장" 또는 "파일에 저장" 선택
+          버튼을 누르면 바로 다운로드됩니다
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-          <button onClick={handleSave}
-            style={{ padding: "13px 36px", background: C.black, color: C.white, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700, letterSpacing: 0.5 }}>
-            PDF 저장
+          <button onClick={handleSave} disabled={saving}
+            style={{ padding: "13px 36px", background: saving ? C.gray400 : C.black, color: C.white, border: "none", cursor: saving ? "wait" : "pointer", fontSize: 14, fontWeight: 700, letterSpacing: 0.5, transition: "background .2s" }}>
+            {saving ? "저장 중..." : "PDF 저장"}
           </button>
           <button onClick={() => setDismissed(true)}
             style={{ padding: "13px 28px", background: C.white, color: C.gray400, border: `1px solid ${C.gray200}`, cursor: "pointer", fontSize: 13 }}>
@@ -430,7 +457,7 @@ function ResultView({ data, onRestart }) {
       </div>{/* end pdf area */}
 
       {/* PDF */}
-      <PdfExport />
+      <PdfExport data={data} />
 
       {/* Restart */}
       <div className="no-print" style={{ textAlign: "center", marginTop: 48 }}>
